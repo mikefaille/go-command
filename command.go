@@ -15,6 +15,7 @@ func printCommand(cmd *exec.Cmd) {
 
 func printError(err error) {
 	if err != nil {
+		fmt.Print("error!!!")
 		os.Stderr.WriteString(fmt.Sprintf("==> Error: %s\n", err.Error()))
 	}
 }
@@ -25,18 +26,26 @@ func printOutput(outs []byte) {
 	}
 }
 
+type StdMsg struct {
+	stdout, stderr *bytes.Buffer
+}
+
 func main() {
-
+	machineName := "infra5"
 	/// go get github.com/coreos/etcd//etcdctl
-	cmd := exec.Command("etcdctl", "-C", "http://172.17.42.1:4002", "member", "add", "infra5", "http://172.17.42.1:4005") // "/dev/random"
+	cmd := exec.Command("etcdctl", "-C", "http://172.17.42.1:4002", "member", "add", machineName, "http://172.17.42.1:4005") // "/dev/random"
 	//	cmd := exec.Command("ls", "/")
-	randomBytes := &bytes.Buffer{}
-	cmd.Stdout = randomBytes
 
+	stdmsg := StdMsg{}
+	stdmsg.stderr = &bytes.Buffer{}
+	stdmsg.stdout = &bytes.Buffer{}
+	cmd.Stdout = stdmsg.stderr
+	cmd.Stderr = stdmsg.stdout
 	// Start command asynchronously
 	err := cmd.Start()
-	printError(err)
 
+	// Print command error when command is never exec
+	printError(err)
 	// Create a ticker that outputs elapsed time
 	ticker := time.NewTicker(time.Second)
 	go func(ticker *time.Ticker) {
@@ -61,7 +70,17 @@ func main() {
 	// Only proceed once the process has finished
 	cmd.Wait()
 	//	fmt.Println(string(randomBytes.Bytes()))
-	printOutput(
-		randomBytes.Bytes(),
-	)
+
+	outmsg := string(stdmsg.stdout.Bytes())
+	if strings.Contains(outmsg, "Added member named "+machineName) {
+		printOutput(
+			stdmsg.stdout.Bytes(),
+		)
+
+	} else {
+
+		printOutput(stdmsg.stderr.Bytes())
+
+	}
+
 }
